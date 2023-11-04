@@ -19,10 +19,17 @@ Similarly to run a python test, `test_foobar`, instead of having to
 
 one can run `snipe --py test_foobar` and the above sequence is automated.
 
-### Building and running
+### Installation
 
-The project can be built with cargo. The binary should then be copied somewhere to the path, and the commands below
-should be run from within the redpanda project root.
+The project can be built and installed with cargo. After cloning run.
+
+```shell
+cargo install --path .
+```
+
+This will install the compiled binary to `~/.cargo/bin/`, make sure this is part of the path.
+
+Finally, the commands below should be run from within the redpanda project root.
 
 ### Running a C++ unit test
 
@@ -43,6 +50,24 @@ Use the `-e` flag. This presents a prompt before running each command, allowing 
 ```shell
 $ snipe -e --cc test_aws_credentials
 ```
+
+### Autocomplete
+
+Add the following function to your shell config file (eg `.bashrc`):
+
+```shell
+function snipe_completion() {
+    local word=${COMP_WORDS[COMP_CWORD]}
+    local line=$(echo ${COMP_LINE} | tr -s '[:blank:]' ',' | tr -d '-')
+    local tokens=$(snipe --cli-content "${line}")
+    COMPREPLY=($(compgen -W "${tokens}" -- $word))
+}
+
+complete -F snipe_completion snipe
+```
+
+This should enable test names to be tab completed, names are picked based on the argument,
+eg `--cc` only completes C++ tests and `--py` only completes python tests.
 
 ### Customizing behavior
 

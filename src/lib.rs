@@ -5,7 +5,7 @@ use std::fs::{self};
 use std::io::{stdin, stdout, Write};
 
 use anyhow::{anyhow, Result};
-use clap::{ArgGroup, Parser};
+use clap::{command, ArgGroup, Parser};
 
 use cmake_parser::structures::RpTest;
 use py_parser::ClassWithTests;
@@ -23,6 +23,9 @@ mod py_parser;
 pub mod shell_commands;
 
 mod scanners;
+
+const CC_DB_FNAME: &'static str = "cc.json";
+const PY_DB_FNAME: &'static str = "py.json";
 
 fn select_from_list<T>(items: Vec<T>, name: &str) -> Result<Option<T>>
 where
@@ -75,7 +78,7 @@ pub enum TestKind {
 
 #[derive(Parser)]
 #[command(author, version, about)]
-#[clap(group(ArgGroup::new("test-kind").required(true).args(["cc", "py"])))]
+#[clap(group(ArgGroup::new("test-kind").required(true).args(["cc", "py", "cli_content"])))]
 pub struct Cli {
     #[clap(long, value_name = "C++ test name")]
     cc: Option<String>,
@@ -93,6 +96,13 @@ pub struct Cli {
         help = "Seed defaults from config file (and copy to default location for future runs)"
     )]
     config_file: Option<String>,
+
+    #[arg(
+        long,
+        value_name = "Auto-complete",
+        help = "Provide test names for auto completion"
+    )]
+    pub cli_content: Option<String>,
 }
 
 #[derive(Clone)]
@@ -131,12 +141,16 @@ pub struct SearchAndExecute {
     command_environment: CommandEnv,
 }
 
+fn get_db_file(kind: &TestKind) -> &'static str {
+    match kind {
+        TestKind::Cc => CC_DB_FNAME,
+        TestKind::Py => PY_DB_FNAME,
+    }
+}
+
 impl SearchAndExecute {
     fn file_name(&self) -> &str {
-        match self.kind {
-            TestKind::Cc => "cc.json",
-            TestKind::Py => "py.json",
-        }
+        get_db_file(&self.kind)
     }
 
     fn scan_and_store_definitions(&self) -> Result<()> {
@@ -234,6 +248,48 @@ impl SearchAndExecute {
                 Ok(())
             }
         }
+    }
+
+    fn do_autocomplete(command_line: &str) -> Result<Vec<String>> {
+        let tokens: Vec<_> = command_line.split(",").collect();
+        let kind = if tokens.iter().any(|token| *token == "cc") {
+            Some(TestKind::Cc)
+        } else if tokens.iter().any(|token| *token == "py") {
+            Some(TestKind::Py)
+        } else {
+            return Err(anyhow!("no test kind"));
+        };
+
+        let scan_config = load_configuration(None).expect("Failed to load scan config");
+        let command_config = load_configuration(None).expect("Failed to load command config");
+        let command_environment = load_configuration(None).expect("Failed to load command envs");
+
+        let sar = Self {
+            kind: kind.unwrap(),
+            name: "".to_owned(),
+            edit: false,
+            scan_config,
+            command_config,
+            command_environment,
+        };
+
+        sar.ensure_db_exists()?;
+        let tests = sar.load_tests_from_db()?;
+        let mut test_names = vec![];
+        for test_suite in tests {
+            match test_suite {
+                TestSuite::C(rp_test) => test_names.extend(rp_test.tests),
+                TestSuite::P(py) => test_names.extend(py.tests),
+                TestSuite::None => {}
+            }
+        }
+
+        Ok(test_names)
+    }
+
+    pub fn autocomplete(command_line: &str) {
+        let tokens = Self::do_autocomplete(command_line).unwrap_or(Default::default());
+        println!("{}", tokens.join(" "));
     }
 }
 
