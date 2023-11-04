@@ -90,14 +90,6 @@ pub struct Cli {
     edit: bool,
 
     #[arg(
-        short,
-        long,
-        value_name = "Config file",
-        help = "Seed defaults from config file (and copy to default location for future runs)"
-    )]
-    config_file: Option<String>,
-
-    #[arg(
         long,
         value_name = "Auto-complete",
         help = "Provide test names for auto completion"
@@ -302,8 +294,7 @@ impl From<Cli> for SearchAndExecute {
         } else {
             panic!("unexpected run config")
         };
-        let scan_config =
-            load_configuration(value.config_file).expect("Failed to load scan config");
+        let scan_config = load_configuration(None).expect("Failed to load scan config");
         let command_config = load_configuration(None).expect("Failed to load command config");
         let command_environment = load_configuration(None).expect("Failed to load command envs");
         Self {
