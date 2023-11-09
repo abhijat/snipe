@@ -65,6 +65,7 @@ pub fn find_tests_in_cc_source(test_source: &Path) -> anyhow::Result<HashSet<Str
     let tags = [
         "FIXTURE_TEST",
         "SEASTAR_THREAD_TEST_CASE",
+        "SEASTAR_TEST_CASE",
         "BOOST_AUTO_TEST_CASE",
     ]
     .into_iter()
